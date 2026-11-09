@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Earnings{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Earnings</h1>
+    <div class="subtle">Register income manually after confirming payment on the platform.</div>
+  </div>
+</div>
+
+<div class="grid cols-4">
+  <div class="card tight"><div class="kpi-label">Paid</div><div class="kpi-value small">${{ totals.get('paid', 0)|money }}</div></div>
+  <div class="card tight"><div class="kpi-label">Pending</div><div class="kpi-value small">${{ totals.get('pending', 0)|money }}</div></div>
+  <div class="card tight"><div class="kpi-label">Failed</div><div class="kpi-value small">${{ totals.get('failed', 0)|money }}</div></div>
+  <div class="card tight"><div class="kpi-label">Records</div><div class="kpi-value small">{{ total }}</div></div>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <h2>Record earning</h2>
+  <form method="post" action="{{ url_for('earnings.add') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-grid">
+      <div>
+        <label for="amount">Amount</label>
+        <input id="amount" name="amount" type="number" step="0.01" min="0.01" required>
+      </div>
+      <div>
+        <label for="currency">Currency</label>
+        <input id="currency" name="currency" type="text" value="USD">
+      </div>
+      <div>
+        <label for="status">Status</label>
+        <select id="status" name="status">
+          <option value="pending">pending</option>
+          <option value="paid">paid</option>
+          <option value="failed">failed</option>
+          <option value="void">void</option>
+        </select>
+      </div>
+      <div>
+        <label for="platform_id">Platform</label>
+        <select id="platform_id" name="platform_id">
+          <option value="">—</option>
+          {% for platform in platforms %}<option value="{{ platform.id }}">{{ platform.name }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <label for="task_id">Related task</label>
+    <select id="task_id" name="task_id">
+      <option value="">—</option>
+      {% for task in tasks %}<option value="{{ task.id }}">#{{ task.id }} · {{ task.title[:80] }}</option>{% endfor %}
+    </select>
+    <div class="form-grid">
+      <div>
+        <label for="reference">Payment reference</label>
+        <input id="reference" name="reference" type="text">
+      </div>
+      <div>
+        <label for="notes">Notes</label>
+        <input id="notes" name="notes" type="text">
+      </div>
+    </div>
+    <div class="form-actions"><button class="btn" type="submit">Add earning</button></div>
+  </form>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <h2>History</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Date</th><th>Task</th><th>Platform</th><th class="right">Amount</th><th>Status</th><th>Reference</th><th></th></tr></thead>
+      <tbody>
+      {% for earning in earnings %}
+        <tr>
+          <td class="small">{{ earning.created_at|dt }}</td>
+          <td class="small">{% if earning.task %}<a href="{{ url_for('tasks.detail', task_id=earning.task.id) }}">#{{ earning.task.id }}</a>{% else %}—{% endif %}</td>
+          <td class="small">{{ earning.task.platform.name if earning.task and earning.task.platform else (earning.platform_id or '—') }}</td>
+          <td class="right">${{ earning.amount|money }} {{ earning.currency }}</td>
+          <td><span class="badge {{ earning.status }}">{{ earning.status }}</span></td>
+          <td class="small">{{ earning.reference or '—' }}</td>
+          <td>
+            {% if earning.status != 'paid' %}
+            <form method="post" action="{{ url_for('earnings.mark_paid', earning_id=earning.id) }}" class="inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn ghost small" type="submit">Mark paid</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7" class="empty">No earnings recorded.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if pages > 1 %}
+  <div class="pagination">
+    {% for p in range(1, pages + 1) %}
+      {% if p == page %}<span class="current">{{ p }}</span>{% else %}<a href="{{ url_for('earnings.index', page=p) }}">{{ p }}</a>{% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,113 @@
+application:
+  name: AutonomousAgent
+  environment: production
+  timezone: America/Guayaquil
+  secret_key_env: APP_SECRET_KEY
+  base_url: ""
+  session_lifetime_minutes: 480
+
+database:
+  url_env: DATABASE_URL
+  pool_size: 5
+  pool_recycle: 280
+
+ai:
+  provider: opencode_go
+  model: deepseek-v4.1-flash
+  base_url: https://opencode.ai/inference/go/openai/v1
+  api_key_env: AI_API_KEY
+  max_requests_per_task: 10
+  timeout_seconds: 300
+  max_output_tokens: 4000
+  temperature: 0.2
+  retries: 2
+  session_header: x-opencode-session
+  user_agent: jobagents-agent/1.0
+  pricing:
+    deepseek-v4.1-flash:
+      input_per_1m: 0.30
+      output_per_1m: 1.20
+    kimi-k2.7-code:
+      input_per_1m: 0.95
+      output_per_1m: 4.00
+  profiles:
+    mixed:
+      analysis: deepseek-v4.1-flash
+      execution: kimi-k2.7-code
+      verification: deepseek-v4.1-flash
+
+agent:
+  enabled: true
+  mode: observation
+  observation_mode: true
+  scan_interval_minutes: 30
+  max_tasks_per_day: 10
+  max_concurrent_tasks: 1
+  max_task_age_days: 30
+  require_manual_claim_approval: true
+  require_manual_delivery_approval: true
+
+profitability:
+  minimum_profit_usd: 0.10
+  minimum_hourly_rate_usd: 0.50
+  minimum_success_probability: 0.35
+  platform_fee_percent: 0.0
+  platform_fee_fixed_usd: 0.0
+  infrastructure_cost_per_task_usd: 0.01
+  assumed_ai_requests_per_task: 6
+
+budget:
+  daily_limit_usd: 0.50
+  monthly_limit_usd: 10.00
+  max_ai_requests_per_day: 200
+
+execution:
+  docker_enabled: true
+  docker_image: jobagents-sandbox:latest
+  network_enabled_by_default: false
+  max_execution_minutes: 15
+  max_memory_mb: 512
+  max_cpus: 0.5
+  max_pids: 128
+  workspace_root: var/workspaces
+  artifacts_dir: var/artifacts
+  allow_host_execution: false
+
+security:
+  require_automation_permission: true
+  require_task_verification: true
+  require_manual_approval_for_unknown_platforms: true
+  max_task_description_chars: 20000
+  enable_injection_scan: true
+  login_max_attempts: 5
+  login_lockout_minutes: 15
+
+worker:
+  heartbeat_seconds: 30
+  lock_file: var/worker.lock
+  stale_after_seconds: 120
+  poll_seconds: 5
+
+logging:
+  level: INFO
+
+bootstrap:
+  platforms:
+    - name: GitHub Bounties
+      slug: github_bounties
+      adapter: github_bounty
+      enabled: false
+      automation_permission: unknown
+      scan_interval_minutes: 60
+      config:
+        search_queries:
+          - "is:issue is:open label:bounty"
+          - "is:issue is:open label:\"💎 Bounty\""
+        allowed_repos: []
+        max_results: 30
+        min_reward_usd: 0.50
+        claim_comment: ""
+        require_repo_permission_check: true
+        limits:
+          max_tasks_per_scan: 20
+          max_tasks_per_day: 5

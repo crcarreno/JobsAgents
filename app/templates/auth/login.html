@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block content %}
+<div class="login-wrap">
+  <div class="card login-card">
+    <h1>AutonomousAgent</h1>
+    <p class="subtle small">Administrative access to the autonomous job agent.</p>
+    <form method="post" action="{{ url_for('auth.login') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="username">Username</label>
+      <input id="username" name="username" type="text" autocomplete="username" required autofocus>
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required>
+      <div class="form-actions">
+        <button class="btn" type="submit">Sign in</button>
+      </div>
+    </form>
+    <p class="subtle small" style="margin-top:16px">
+      Credentials are stored as scrypt hashes. Sessions are protected with CSRF tokens and secure cookies in production.
+    </p>
+  </div>
+</div>
+{% endblock %}

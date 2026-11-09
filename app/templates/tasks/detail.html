@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}Task {{ task.id }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>{{ task.title }}</h1>
+    <div class="subtle">
+      <span class="badge {{ task.status }}">{{ task.status }}</span>
+      <span class="badge {{ task.platform.automation_permission if task.platform else 'unknown' }}">
+        platform automation: {{ task.platform.automation_permission if task.platform else 'unknown' }}
+      </span>
+      {% if task.automation_allowed is sameas true %}<span class="badge ok">task automation allowed</span>
+      {% elif task.automation_allowed is sameas false %}<span class="badge danger">task automation denied</span>
+      {% else %}<span class="badge warn">task automation unverified</span>{% endif %}
+    </div>
+    <div class="small mono">{{ task.external_id }}{% if task.url %} · <a href="{{ task.url }}" target="_blank" rel="noopener noreferrer">open source page</a>{% endif %}</div>
+  </div>
+  <div><a class="btn ghost small" href="{{ url_for('tasks.index') }}">Back to tasks</a></div>
+</div>
+
+<div class="grid cols-4">
+  <div class="card tight"><div class="kpi-label">Reward</div><div class="kpi-value small">${{ task.reward_amount|money }}</div></div>
+  <div class="card tight"><div class="kpi-label">Net profit</div><div class="kpi-value small">${{ task.net_profit|money }}</div></div>
+  <div class="card tight"><div class="kpi-label">Hourly rate</div><div class="kpi-value small">${{ task.hourly_rate|money }}</div></div>
+  <div class="card tight"><div class="kpi-label">Success probability</div><div class="kpi-value small">{{ (task.success_probability * 100)|round(0) }}%</div></div>
+</div>
+
+<div class="grid cols-2" style="margin-top:16px">
+  <div class="card">
+    <h2>Actions</h2>
+    <div class="pill-row">
+      {% if task.status in ['pending', 'manual_review', 'rejected', 'failed'] %}
+      <form method="post" action="{{ url_for('tasks.evaluate', task_id=task.id) }}" class="inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn secondary" type="submit">Run evaluation</button>
+      </form>
+      {% endif %}
+
+      {% if task.status in ['manual_review', 'pending', 'rejected'] %}
+      <form method="post" action="{{ url_for('tasks.approve', task_id=task.id) }}" class="inline" data-confirm="Approve this task for execution?">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if task.automation_allowed is not sameas true %}
+        <div class="checkbox-row">
+          <input id="confirm_automation" type="checkbox" name="confirm_automation">
+          <label for="confirm_automation" style="margin:0">I verified that this platform and repository allow automated contributions</label>
+        </div>
+        {% endif %}
+        <button class="btn" type="submit">Approve</button>
+      </form>
+      {% endif %}
+
+      {% if task.status in ['approved', 'manual_review'] and task.automation_allowed is sameas true %}
+      <form method="post" action="{{ url_for('tasks.claim', task_id=task.id) }}" class="inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn secondary" type="submit">Claim task</button>
+      </form>
+      <form method="post" action="{{ url_for('tasks.execute', task_id=task.id) }}" class="inline" data-confirm="Execute this task in an isolated sandbox?">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn" type="submit">Execute now</button>
+      </form>
+      {% endif %}
+
+      {% if task.status in ['ready_to_submit', 'manual_review'] and task.automation_allowed is sameas true %}
+      <form method="post" action="{{ url_for('tasks.deliver', task_id=task.id) }}" class="inline" data-confirm="Deliver this task to the platform?">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn" type="submit">Deliver</button>
+      </form>
+      {% endif %}
+
+      {% if task.status == 'submitted' %}
+      <form method="post" action="{{ url_for('tasks.refresh', task_id=task.id) }}" class="inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn secondary" type="submit">Refresh platform status</button>
+      </form>
+      {% endif %}
+
+      {% if task.status not in ['accepted', 'expired'] %}
+      <form method="post" action="{{ url_for('tasks.reject', task_id=task.id) }}" class="inline" data-confirm="Reject this task?">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="reason" value="rejected by administrator">
+        <button class="btn danger" type="submit">Reject</button>
+      </form>
+      {% endif %}
+    </div>
+    {% if task.last_reason %}<p class="subtle small" style="margin-top:12px">Last reason: {{ task.last_reason }}</p>{% endif %}
+    {% if task.automation_notes %}<p class="subtle small">Automation notes: {{ task.automation_notes }}</p>{% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Economics and timing</h2>
+    <div class="stat-list">
+      <div class="row"><span>Platform fee</span><strong>${{ task.platform_fee|money }}</strong></div>
+      <div class="row"><span>Estimated AI cost</span><strong>${{ task.ai_cost_estimate|money }}</strong></div>
+      <div class="row"><span>Infrastructure cost</span><strong>${{ task.infrastructure_cost|money }}</strong></div>
+      <div class="row"><span>Estimated minutes</span><strong>{{ task.estimated_minutes }}</strong></div>
+      <div class="row"><span>Complexity (1-5)</span><strong>{{ task.complexity }}</strong></div>
+      <div class="row"><span>Risk score</span><strong>{{ task.risk_score }}</strong></div>
+      <div class="row"><span>Claimed at</span><strong>{{ task.claimed_at|dt }}</strong></div>
+      <div class="row"><span>Submitted at</span><strong>{{ task.submitted_at|dt }}</strong></div>
+      <div class="row"><span>Delivery reference</span><strong class="mono small">{{ task.delivery_reference or '—' }}</strong></div>
+    </div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <h2>Description</h2>
+  <div class="small" style="white-space: pre-wrap">{{ task.description }}</div>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <h2>Evaluation</h2>
+  <pre class="json">{{ task.evaluation | tojson(indent=2) }}</pre>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <h2>Executions</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Attempt</th><th>Status</th><th>Model</th><th class="right">Requests</th><th class="right">AI cost</th><th>Started</th><th>Finished</th></tr></thead>
+      <tbody>
+      {% for execution in executions %}
+        <tr>
+          <td class="mono">{{ execution.attempt }}</td>
+          <td><span class="badge {{ execution.status }}">{{ execution.status }}</span></td>
+          <td class="small mono">{{ execution.model or '—' }}</td>
+          <td class="right">{{ execution.ai_requests }}</td>
+          <td class="right">${{ execution.ai_cost|money }}</td>
+          <td class="small">{{ execution.started_at|dt }}</td>
+          <td class="small">{{ execution.finished_at|dt }}</td>
+        </tr>
+        <tr>
+          <td colspan="7">
+            <details>
+              <summary class="small">Execution {{ execution.attempt }} details</summary>
+              {% if execution.error %}<p class="small" style="color:#ff9b95">Error: {{ execution.error }}</p>{% endif %}
+              {% if execution.output_summary %}<p class="small">{{ execution.output_summary }}</p>{% endif %}
+              <div class="small"><strong>Artifacts</strong></div>
+              <ul class="small">
+                {% for artifact in execution.artifacts or [] %}
+                <li class="mono">{{ artifact.path }} ({{ artifact.size }} bytes)</li>
+                {% else %}
+                <li class="subtle">No artifacts.</li>
+                {% endfor %}
+              </ul>
+            </details>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7" class="empty">No executions yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <h2>Status history</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>When</th><th>From</th><th>To</th><th>Actor</th><th>Reason</th></tr></thead>
+      <tbody>
+      {% for entry in history %}
+        <tr>
+          <td class="small">{{ entry.created_at|dt }}</td>
+          <td><span class="badge">{{ entry.from_status or '—' }}</span></td>
+          <td><span class="badge {{ entry.to_status }}">{{ entry.to_status }}</span></td>
+          <td class="small">{{ entry.actor }}</td>
+          <td class="small">{{ entry.reason or '' }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5" class="empty">No history.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Settings</h1>
+    <div class="subtle">Effective values: database overrides → environment → config.yaml → defaults.</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>AI provider (OpenCode Go)</h2>
+  <form method="post" action="{{ url_for('settings.save_ai') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-grid">
+      <div>
+        <label for="ai_provider">Provider</label>
+        <select id="ai_provider" name="ai_provider">
+          <option value="opencode_go" {{ 'selected' if ai_provider == 'opencode_go' else '' }}>opencode_go</option>
+        </select>
+      </div>
+      <div>
+        <label for="ai_model">Model or profile</label>
+        <input id="ai_model" name="ai_model" type="text" value="{{ ai_model }}" placeholder="mixed">
+      </div>
+      <div>
+        <label for="ai_max_requests">Max requests per task</label>
+        <input id="ai_max_requests" name="ai_max_requests" type="number" min="1" value="{{ ai_max_requests }}">
+      </div>
+      <div>
+        <label for="ai_timeout">Timeout (seconds)</label>
+        <input id="ai_timeout" name="ai_timeout" type="number" min="30" value="{{ ai_timeout }}">
+      </div>
+    </div>
+    <label for="api_key">API key (leave empty to keep the current value)</label>
+    <input id="api_key" name="api_key" type="password" autocomplete="new-password" placeholder="{{ 'configured' if api_key_configured else 'not configured' }}">
+    <p class="subtle small">
+      The key is stored encrypted with Fernet (APP_SECRET_KEY) or read from the AI_API_KEY environment variable.
+      It is never displayed or written to logs. The <span class="mono">mixed</span> profile maps analysis and execution
+      to the real model IDs configured in <span class="mono">config.yaml</span>.
+    </p>
+    <div class="form-actions">
+      <button class="btn" type="submit">Save AI settings</button>
+    </div>
+  </form>
+  <form method="post" action="{{ url_for('settings.test_ai') }}" class="inline" style="margin-top:10px">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="btn secondary" type="submit">Test AI connection</button>
+  </form>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <h2>GitHub token</h2>
+  <form method="post" action="{{ url_for('settings.save_github_token') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label for="github_token">Token (leave empty to clear)</label>
+    <input id="github_token" name="github_token" type="password" autocomplete="new-password" placeholder="{{ 'configured' if github_token_configured else 'not configured' }}">
+    <p class="subtle small">
+      Needed for claiming issues and opening pull requests. Use a token with the smallest possible scope
+      (public_repo or repo). Stored encrypted or supplied through the GITHUB_TOKEN environment variable.
+    </p>
+    <div class="form-actions"><button class="btn" type="submit">Save token</button></div>
+  </form>
+</div>
+
+<form method="post" action="{{ url_for('settings.save') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="card" style="margin-top:16px">
+    <h2>Operating mode and agent</h2>
+    <div class="form-grid">
+      <div>
+        <label for="mode">Mode</label>
+        <select id="mode" name="mode">
+          {% for option in ['observation', 'semiautomatic', 'autonomous'] %}
+          <option value="{{ option }}" {{ 'selected' if mode == option else '' }}>{{ option }}</option>
+          {% endfor %}
+        </select>
+        <p class="subtle small">Autonomous mode requires at least one enabled platform with verified automation permission.</p>
+      </div>
+      <div>
+        <label>Agent enabled</label>
+        <div class="checkbox-row">
+          <input id="agent_enabled" type="checkbox" name="agent_enabled" {{ 'checked' if current['agent.enabled'] else '' }}>
+          <label for="agent_enabled" style="margin:0">Run scheduled scans and processing</label>
+        </div>
+      </div>
+      <div>
+        <label for="scan_interval">Scan interval (minutes)</label>
+        <input id="scan_interval" name="scan_interval" type="number" min="1" value="{{ current['agent.scan_interval_minutes'] }}">
+      </div>
+      <div>
+        <label for="max_tasks_day">Max task executions per day</label>
+        <input id="max_tasks_day" name="max_tasks_day" type="number" min="1" value="{{ current['agent.max_tasks_per_day'] }}">
+      </div>
+      <div>
+        <label for="max_task_age">Max task age (days)</label>
+        <input id="max_task_age" name="max_task_age" type="number" min="1" value="{{ current['agent.max_task_age_days'] }}">
+      </div>
+      <div>
+        <label>Manual approvals</label>
+        <div class="checkbox-row">
+          <input id="manual_claim" type="checkbox" name="manual_claim" {{ 'checked' if current['agent.require_manual_claim_approval'] else '' }}>
+          <label for="manual_claim" style="margin:0">Require approval to claim</label>
+        </div>
+        <div class="checkbox-row">
+          <input id="manual_delivery" type="checkbox" name="manual_delivery" {{ 'checked' if current['agent.require_manual_delivery_approval'] else '' }}>
+          <label for="manual_delivery" style="margin:0">Require approval to deliver</label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h2>Profitability thresholds</h2>
+    <div class="form-grid">
+      <div>
+        <label for="min_profit">Minimum net profit (USD)</label>
+        <input id="min_profit" name="min_profit" type="number" step="0.01" value="{{ current['profitability.minimum_profit_usd'] }}">
+      </div>
+      <div>
+        <label for="min_hourly">Minimum hourly rate (USD)</label>
+        <input id="min_hourly" name="min_hourly" type="number" step="0.01" value="{{ current['profitability.minimum_hourly_rate_usd'] }}">
+      </div>
+      <div>
+        <label for="min_probability">Minimum success probability (0-1)</label>
+        <input id="min_probability" name="min_probability" type="number" step="0.01" min="0" max="1" value="{{ current['profitability.minimum_success_probability'] }}">
+      </div>
+      <div>
+        <label for="fee_percent">Platform fee (fraction)</label>
+        <input id="fee_percent" name="fee_percent" type="number" step="0.01" value="{{ current['profitability.platform_fee_percent'] }}">
+      </div>
+      <div>
+        <label for="fee_fixed">Platform fixed fee (USD)</label>
+        <input id="fee_fixed" name="fee_fixed" type="number" step="0.01" value="{{ current['profitability.platform_fee_fixed_usd'] }}">
+      </div>
+      <div>
+        <label for="infra_cost">Infrastructure cost per task (USD)</label>
+        <input id="infra_cost" name="infra_cost" type="number" step="0.001" value="{{ current['profitability.infrastructure_cost_per_task_usd'] }}">
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h2>Budgets</h2>
+    <div class="form-grid">
+      <div>
+        <label for="daily_limit">Daily AI budget (USD)</label>
+        <input id="daily_limit" name="daily_limit" type="number" step="0.01" min="0" value="{{ current['budget.daily_limit_usd'] }}">
+      </div>
+      <div>
+        <label for="monthly_limit">Monthly AI budget (USD)</label>
+        <input id="monthly_limit" name="monthly_limit" type="number" step="0.01" min="0" value="{{ current['budget.monthly_limit_usd'] }}">
+      </div>
+      <div>
+        <label for="max_requests">Max AI requests per day</label>
+        <input id="max_requests" name="max_requests" type="number" min="1" value="{{ current['budget.max_ai_requests_per_day'] }}">
+      </div>
+    </div>
+    <p class="subtle small">Spent today: ${{ budget.spent_today|money }} · Spent this month: ${{ budget.spent_month|money }}</p>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h2>Execution and security</h2>
+    <div class="form-grid">
+      <div>
+        <label>Execution</label>
+        <div class="checkbox-row">
+          <input id="docker_enabled" type="checkbox" name="docker_enabled" {{ 'checked' if current['execution.docker_enabled'] else '' }}>
+          <label for="docker_enabled" style="margin:0">Enable Docker sandbox</label>
+        </div>
+        <div class="checkbox-row">
+          <input id="network_enabled" type="checkbox" name="network_enabled" {{ 'checked' if current['execution.network_enabled_by_default'] else '' }}>
+          <label for="network_enabled" style="margin:0">Allow network inside sandbox</label>
+        </div>
+      </div>
+      <div>
+        <label for="max_execution">Max execution minutes</label>
+        <input id="max_execution" name="max_execution" type="number" min="1" value="{{ current['execution.max_execution_minutes'] }}">
+      </div>
+      <div>
+        <label for="max_memory">Max memory (MB)</label>
+        <input id="max_memory" name="max_memory" type="number" min="128" value="{{ current['execution.max_memory_mb'] }}">
+      </div>
+      <div>
+        <label>Verification gates</label>
+        <div class="checkbox-row">
+          <input id="require_permission" type="checkbox" name="require_permission" {{ 'checked' if current['security.require_automation_permission'] else '' }}>
+          <label for="require_permission" style="margin:0">Require verified automation permission</label>
+        </div>
+        <div class="checkbox-row">
+          <input id="require_verification" type="checkbox" name="require_verification" {{ 'checked' if current['security.require_task_verification'] else '' }}>
+          <label for="require_verification" style="margin:0">Require task verification before delivery</label>
+        </div>
+      </div>
+    </div>
+    <div class="form-actions"><button class="btn" type="submit">Save settings</button></div>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Dashboard</h1>
+    <div class="subtle">Mode: <span class="badge info">{{ mode }}</span>
+      {% if agent_enabled %}<span class="badge ok">agent enabled</span>{% else %}<span class="badge danger">agent disabled</span>{% endif %}
+    </div>
+  </div>
+  <div class="subtle small">
+    Last scan: <strong>{{ last_scan|dt }}</strong><br>
+    Next scan: <strong>{{ next_scan|dt }}</strong>
+  </div>
+</div>
+
+<div class="grid cols-4">
+  <div class="card tight"><div class="kpi-label">Tasks found</div><div class="kpi-value">{{ outcomes.found }}</div></div>
+  <div class="card tight"><div class="kpi-label">Approved</div><div class="kpi-value">{{ outcomes.approved }}</div></div>
+  <div class="card tight"><div class="kpi-label">Executed</div><div class="kpi-value">{{ outcomes.executed }}</div></div>
+  <div class="card tight"><div class="kpi-label">Delivered</div><div class="kpi-value">{{ outcomes.delivered }}</div></div>
+</div>
+
+<div class="grid cols-4" style="margin-top:16px">
+  <div class="card tight"><div class="kpi-label">Income today</div><div class="kpi-value small">${{ income_today|money }}</div></div>
+  <div class="card tight"><div class="kpi-label">Income this month</div><div class="kpi-value small">${{ income_month|money }}</div></div>
+  <div class="card tight"><div class="kpi-label">AI spend (month)</div><div class="kpi-value small">${{ ai_spend|money }}</div></div>
+  <div class="card tight"><div class="kpi-label">Estimated net</div>
+    <div class="kpi-value small" style="color: {{ '#6ee7a8' if net_estimated >= 0 else '#ff9b95' }}">${{ net_estimated|money }}</div>
+  </div>
+</div>
+
+<div class="grid cols-2" style="margin-top:16px">
+  <div class="card">
+    <h2>Income last 7 days</h2>
+    <div class="chart">
+      {% for point in series %}
+      <div class="bar">
+        <div class="bar-fill" style="height: {{ (point.value / max_series * 100)|round(1) }}%"></div>
+        <div class="bar-label">{{ point.day }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="subtle small" style="margin-top:10px">Total paid income: ${{ income_total|money }}</div>
+  </div>
+
+  <div class="card">
+    <h2>Budget</h2>
+    <div class="stat-list">
+      <div class="row"><span>Spent today</span><strong>${{ budget.spent_today|money }} / ${{ budget.daily_limit|money }}</strong></div>
+      <div class="row"><span>Spent this month</span><strong>${{ budget.spent_month|money }} / ${{ budget.monthly_limit|money }}</strong></div>
+      <div class="row"><span>AI requests today</span><strong>{{ budget.requests_today }} / {{ budget.max_requests_per_day }}</strong></div>
+    </div>
+    <div class="progress"><span style="width: {{ (budget.spent_today / budget.daily_limit * 100)|round(1) if budget.daily_limit else 0 }}%"></span></div>
+    <div class="subtle small" style="margin-top:8px">Daily budget usage</div>
+    <div class="progress"><span style="width: {{ (budget.spent_month / budget.monthly_limit * 100)|round(1) if budget.monthly_limit else 0 }}%"></span></div>
+    <div class="subtle small" style="margin-top:8px">Monthly budget usage</div>
+  </div>
+</div>
+
+<div class="grid cols-2" style="margin-top:16px">
+  <div class="card">
+    <h2>Worker</h2>
+    {% if worker %}
+    <div class="stat-list">
+      <div class="row"><span>Status</span><span class="badge {{ worker.status }}">{{ worker.status }}</span></div>
+      <div class="row"><span>PID</span><strong>{{ worker.pid or '—' }}</strong></div>
+      <div class="row"><span>Last heartbeat</span><strong>{{ worker.last_heartbeat|dt }}</strong></div>
+      <div class="row"><span>Current task</span><strong>{{ worker.current_task_id or '—' }}</strong></div>
+      <div class="row"><span>Message</span><span class="small">{{ worker.message or '—' }}</span></div>
+    </div>
+    {% else %}
+    <div class="empty">Worker has not reported yet.</div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Task status</h2>
+    <div class="stat-list">
+      {% for status in ['pending','evaluating','approved','executing','completed','ready_to_submit','submitted','accepted','rejected','failed','expired','manual_review'] %}
+      <div class="row"><span class="badge {{ status }}">{{ status }}</span><strong>{{ status_counts.get(status, 0) }}</strong></div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <h2>Platforms</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Name</th><th>Adapter</th><th>Enabled</th><th>Automation</th><th>Status</th><th>Last scan</th><th class="right">Productive tasks</th><th class="right">Estimated net</th><th class="right">Paid</th></tr></thead>
+      <tbody>
+      {% for row in platform_profitability %}
+        {% set platform = row.platform %}
+        <tr>
+          <td><a href="{{ url_for('platforms.edit', platform_id=platform.id) }}">{{ platform.name }}</a></td>
+          <td class="mono small">{{ platform.adapter }}</td>
+          <td>{{ 'yes' if platform.enabled else 'no' }}</td>
+          <td><span class="badge {{ platform.automation_permission }}">{{ platform.automation_permission }}</span></td>
+          <td><span class="badge {{ platform.status }}">{{ platform.status }}</span></td>
+          <td class="small">{{ platform.last_scan_at|dt }}</td>
+          <td class="right">{{ row.productive_tasks }}</td>
+          <td class="right">${{ row.estimated_net|money }}</td>
+          <td class="right">${{ row.paid|money }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="9" class="empty">No platforms configured.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="grid cols-2" style="margin-top:16px">
+  <div class="card">
+    <h2>Recent tasks</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Task</th><th>Status</th><th class="right">Net</th></tr></thead>
+        <tbody>
+        {% for task in recent_tasks %}
+          <tr>
+            <td><a href="{{ url_for('tasks.detail', task_id=task.id) }}">{{ task.title[:60] }}</a></td>
+            <td><span class="badge {{ task.status }}">{{ task.status }}</span></td>
+            <td class="right">${{ task.net_profit|money }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="3" class="empty">No tasks discovered yet.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Recent errors</h2>
+    {% for entry in recent_errors %}
+      <div class="stat-list" style="margin-bottom:10px">
+        <div class="row"><span class="badge danger">{{ entry.level }}</span><span class="small">{{ entry.created_at|dt }}</span></div>
+        <div class="small">{{ entry.message }}</div>
+      </div>
+    {% else %}
+      <div class="empty">No errors recorded.</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

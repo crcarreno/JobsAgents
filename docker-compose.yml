@@ -1,0 +1,60 @@
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: jobagents
+      MYSQL_USER: jobagents
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change-me}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change-root-me}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --max_allowed_packet=64M
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "127.0.0.1:3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "jobagents", "-p${MYSQL_PASSWORD:-change-me}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: mysql+pymysql://jobagents:${MYSQL_PASSWORD:-change-me}@mysql:3306/jobagents?charset=utf8mb4
+      GUNICORN_BIND: 0.0.0.0:8000
+    depends_on:
+      mysql:
+        condition: service_healthy
+    command: ["gunicorn", "--config", "deployment/gunicorn/gunicorn.conf.py", "wsgi:app"]
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./var:/app/var
+
+  worker:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: mysql+pymysql://jobagents:${MYSQL_PASSWORD:-change-me}@mysql:3306/jobagents?charset=utf8mb4
+      # Sandbox execution is supported in the native systemd deployment. Inside
+      # this container the Docker socket path mapping would be wrong, so tasks
+      # that need commands stop at manual review instead of running unverified.
+      JOBAGENTS_EXECUTION_DOCKER_ENABLED: "false"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    command: ["python", "-m", "worker.main"]
+    volumes:
+      - ./var:/app/var
+
+volumes:
+  mysql_data:

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit platform' if platform else 'New platform' }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{{ 'Edit platform' if platform else 'New platform' }}</h1></div>
+  <a class="btn ghost small" href="{{ url_for('platforms.index') }}">Back</a>
+</div>
+
+<form method="post" action="{{ url_for('platforms.edit', platform_id=platform.id) if platform else url_for('platforms.new') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="card">
+    <div class="form-grid">
+      <div>
+        <label for="name">Name</label>
+        <input id="name" name="name" type="text" required value="{{ platform.name if platform else '' }}">
+      </div>
+      <div>
+        <label for="slug">Slug</label>
+        <input id="slug" name="slug" type="text" required value="{{ platform.slug if platform else '' }}" placeholder="github_bounties">
+      </div>
+      <div>
+        <label for="adapter">Adapter</label>
+        <select id="adapter" name="adapter">
+          {% for adapter in adapters %}
+          <option value="{{ adapter }}" {{ 'selected' if platform and platform.adapter == adapter else '' }}>{{ adapter }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="scan_interval_minutes">Scan interval (minutes)</label>
+        <input id="scan_interval_minutes" name="scan_interval_minutes" type="number" min="1" value="{{ platform.scan_interval_minutes if platform else 60 }}">
+      </div>
+      <div>
+        <label for="automation_permission">Automation permission</label>
+        <select id="automation_permission" name="automation_permission">
+          {% for permission in automation_permissions %}
+          <option value="{{ permission }}" {{ 'selected' if platform and platform.automation_permission == permission else '' }}>{{ permission }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label>Enabled</label>
+        <div class="checkbox-row">
+          <input id="enabled" type="checkbox" name="enabled" {{ 'checked' if platform and platform.enabled else '' }}>
+          <label for="enabled" style="margin:0">Enable scheduled scans</label>
+        </div>
+      </div>
+    </div>
+
+    <label for="automation_permission_notes">Automation permission notes (required when allowed)</label>
+    <textarea id="automation_permission_notes" name="automation_permission_notes" style="min-height:80px" placeholder="Cite the platform terms, API documentation or written authorization that permits automation.">{{ platform.automation_permission_notes if platform else '' }}</textarea>
+
+    <label for="config_json">Adapter configuration (JSON)</label>
+    <textarea id="config_json" name="config_json" class="mono">{{ config_json }}</textarea>
+    <p class="subtle small">
+      GitHub adapter keys: search_queries, allowed_repos, max_results, min_reward_usd, claim_comment,
+      automation_allowed_repos, automation_denied_repos, pr_labels, submit_as_draft, fork_wait_seconds.
+      Leave claim_comment empty unless the bounty program documents a claim mechanism.
+    </p>
+
+    <div class="form-actions">
+      <button class="btn" type="submit">Save platform</button>
+      <a class="btn ghost" href="{{ url_for('platforms.index') }}">Cancel</a>
+    </div>
+  </div>
+</form>
+{% endblock %}
