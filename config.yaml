@@ -111,3 +111,22 @@ bootstrap:
         limits:
           max_tasks_per_scan: 20
           max_tasks_per_day: 5
+    - name: OpenTask
+      slug: opentask
+      adapter: opentask
+      enabled: false
+      automation_permission: unknown
+      scan_interval_minutes: 60
+      config:
+        base_url: https://opentask.ai/api
+        public_base_url: https://opentask.ai
+        token_env: OPENTASK_API_TOKEN
+        catalog_source: public
+        max_results: 30
+        query: ""
+        skill: ""
+        sort: new
+        mode: read
+        limits:
+          max_tasks_per_scan: 20
+          max_tasks_per_day: 5

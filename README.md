@@ -16,6 +16,7 @@ El proyecto está implementado de extremo a extremo: panel web, autenticación, 
 - Configuración de IA desde el panel: proveedor, modelo/perfil, límites, presupuesto y API Key cifrada.
 - Integración real con **OpenCode Go** mediante su API oficial de inferencia (`https://opencode.ai/inference/go/openai/v1`), con cabecera de sesión `x-opencode-session`, User-Agent propio, timeout, reintentos y coste real reportado por la API.
 - Adaptador real **GitHub Bounties** usando la API REST oficial de GitHub: búsqueda de issues, detalle, comprobación de permiso de automatización, comentario de claim opcional, apertura de Pull Request y consulta de estado.
+- Adaptador real **OpenTask.ai** en modo estrictamente de lectura: conexión autenticada a `/api/agent/me`, catálogo público `/api/tasks`, detalle autenticado `/api/agent/tasks/{id}` y bloqueo explícito de claims, bids y entregas.
 - Motor de rentabilidad en código convencional (no delegado a la IA).
 - Evaluación con IA y heurística segura cuando no hay API Key.
 - Estados auditables con historial de transiciones e idempotencia en claim y entrega.
@@ -24,7 +25,7 @@ El proyecto está implementado de extremo a extremo: panel web, autenticación, 
 - Verificación determinista (artefactos, secretos, inyección, comandos fallidos) más verificación con IA.
 - Migración Alembic completa y esquema MySQL.
 - Apache 2.4 (HTTP + HTTPS), Gunicorn, systemd, scripts de instalación, despliegue, backup y healthcheck.
-- 45 pruebas automatizadas.
+- 59 pruebas automatizadas.
 
 ### Limitaciones reales y deliberadas
 
@@ -65,6 +66,7 @@ Hallazgos que condicionan el diseño:
 | Plataforma | API para trabajador | Automatización permitida | Ecuador | Decisión |
 |---|---|---|---|---|
 | GitHub + bounties (Algora, sponsors) | Sí, API REST oficial de GitHub | GitHub permite API; el repositorio/funder puede imponer reglas | Sí (pago vía Stripe del funder, p. ej. Algora cubre Ecuador) | **Implementada** |
+| OpenTask.ai | REST oficial + hosted MCP con token/OAuth | Token con scopes; escrituras requieren flujos adicionales | Internacional; pagos wallet-to-wallet | **Implementada (solo lectura)** |
 | Algora Console API | Pública para listar bounties | Su ToS prohíbe acceso automatizado al servicio | Pago por Stripe, Ecuador soportado | No se automatiza su API; se descubre desde GitHub |
 | Toloka | API disponible para *requesters*; el lado *toloker* no tiene API oficial de trabajador | No confirmado para performers | No confirmado | Rechazada |
 | Upwork | API limitada y con aprobación | Bidding automatizado prohibido | Sí | Rechazada |
@@ -114,7 +116,7 @@ execution/       docker_executor, workspace_manager
 migrations/      Alembic (0001_initial)
 deployment/      apache, systemd, gunicorn, docker
 scripts/         install, deploy, start, stop, restart, backup, healthcheck
-tests/           45 pruebas
+tests/           59 pruebas
 ```
 
 ---
@@ -274,6 +276,69 @@ Flujo:
 5. Revisa las tareas en `manual_review`.
 6. Solo tras verificar las reglas del repositorio, añade el repo a `automation_allowed_repos` y marca la plataforma como `allowed`, documentando la autorización.
 7. Ejecuta una tarea manualmente y revisa el PR antes de habilitar `autonomous`.
+
+---
+
+## 9.1 OpenTask.ai (solo lectura)
+
+Integración de descubrimiento y consulta, sin operaciones de escritura.
+
+### Endpoints utilizados
+
+- `GET /api/agent/me` — identidad y estadísticas de la cuenta (Bearer token, `profile:read`).
+- `GET /api/agent/me/capabilities` — capacidades publicadas (`capabilities:read`).
+- `GET /api/tasks` — catálogo público de tareas abiertas; es el backend real de la herramienta MCP documentada `opentask_list_tasks` con `mode: "public"`.
+- `GET /api/agent/tasks/{taskId}` — detalle autenticado (`tasks:read`), con fallback público `GET /api/tasks/{taskId}` cuando no hay token.
+- `GET /api/agent/me/task-recommendations` — fuente alternativa configurable (`catalog_source: recommendations`).
+
+### Token
+
+```bash
+# .env
+OPENTASK_API_TOKEN=ot_...
+```
+
+Scopes mínimos: `profile:read`, `tasks:read`, `capabilities:read`. El token se lee solo de la variable de entorno, nunca se escribe en `config.yaml`, logs ni repositorio.
+
+### Plataforma
+
+```yaml
+- name: OpenTask
+  slug: opentask
+  adapter: opentask
+  enabled: false
+  automation_permission: unknown
+  config:
+    base_url: https://opentask.ai/api
+    public_base_url: https://opentask.ai
+    catalog_source: public
+    max_results: 30
+    mode: read
+```
+
+Después de actualizar `config.yaml`: `flask --app wsgi seed` crea la plataforma si no existe.
+
+### Límites de esta fase
+
+- `claim_task()` y `submit_task()` lanzan `AutomationNotAllowedError`.
+- No se crean bids, entradas, entregas, contratos ni pagos.
+- La recompensa declarada no es escrow: `rewardTerms.fundingStatus` actualmente es `not_escrowed`.
+- `check_automation_permission()` devuelve `unknown`; las tareas quedan en revisión manual.
+- El detalle conserva `executionMode`, `deliveryStructure`, `acceptanceCriteria`, `rewardTerms`, `fundingStatus`, `capabilityRequirements`, `attachments` y `availableActions` en `task.evaluation.detail_extra` y en `raw_payload`.
+
+### Prueba real de lectura
+
+```bash
+python -m scripts.test_opentask
+```
+
+El comando:
+- Lee `OPENTASK_API_TOKEN`.
+- Verifica `/api/agent/me` y `capabilities:read`.
+- Consulta el catálogo y muestra cuántas tareas encontró.
+- Muestra hasta cinco resúmenes y el detalle de la primera.
+- No escribe en MySQL ni modifica OpenTask.
+- Nunca imprime el token.
 
 ---
 

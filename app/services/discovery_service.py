@@ -53,7 +53,7 @@ class DiscoveryService:
             "Platform connection checked",
             platform=platform.slug,
             status=connection.status,
-            message=connection.message[:500],
+            detail=connection.message[:500],
         )
         if not connection.ok and connection.status == "error":
             platform.last_scan_at = utcnow()

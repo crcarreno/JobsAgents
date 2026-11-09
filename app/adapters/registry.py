@@ -2,10 +2,12 @@ from core.config import Config
 from core.exceptions import ConfigurationError
 from app.adapters.base_adapter import BaseAdapter
 from app.adapters.github_adapter import GitHubBountyAdapter
+from app.adapters.opentask_adapter import OpenTaskAdapter
 from app.services.settings_service import SettingsService
 
 ADAPTERS = {
     "github_bounty": GitHubBountyAdapter,
+    "opentask": OpenTaskAdapter,
 }
 
 
@@ -20,4 +22,6 @@ def build_adapter(platform, config: Config, settings: SettingsService) -> BaseAd
     token = ""
     if platform.adapter == "github_bounty":
         token = settings.get_platform_token()
+    elif platform.adapter == "opentask":
+        token = settings.get_opentask_token()
     return adapter_class(platform, config, settings, token=token)

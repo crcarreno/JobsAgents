@@ -187,5 +187,13 @@ class SettingsService:
         row = db.session.get(SystemSetting, "platform.github_token_enc")
         return bool(row and row.value)
 
+    def get_opentask_token(self) -> str:
+        import os
+
+        return os.getenv("OPENTASK_API_TOKEN", "")
+
+    def has_opentask_token(self) -> bool:
+        return bool(self.get_opentask_token())
+
     def export_json(self) -> str:
         return json.dumps(self.public_settings(), indent=2, sort_keys=True)

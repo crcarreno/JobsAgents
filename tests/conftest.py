@@ -15,6 +15,7 @@ os.environ.setdefault("APP_SECRET_KEY", "test-secret-key-for-tests")
 os.environ.setdefault("FLASK_SECRET_KEY", "test-secret-key-for-tests")
 os.environ["AI_API_KEY"] = ""
 os.environ["GITHUB_TOKEN"] = ""
+os.environ["OPENTASK_API_TOKEN"] = ""
 
 import pymysql
 import pytest

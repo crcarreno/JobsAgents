@@ -190,6 +190,7 @@ class EvaluatorService:
             "ai_used": ai_used,
             "expected_output": detail.expected_output,
             "language": detail.language,
+            "detail_extra": detail.extra,
             "repo": detail.extra.get("repo"),
             "default_branch": detail.extra.get("default_branch"),
             "automation": {"status": automation_status, "notes": automation_notes},
